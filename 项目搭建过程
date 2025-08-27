@@ -1,0 +1,4 @@
+# 搜寻 情绪分析 的方法：
+- 情绪字典，情绪分析
+- https://github.com/jeffmxh/emotion_analyse_py
+- 然后发现这个git里面都是分析的excel，所以我先把word转化为了excel.
