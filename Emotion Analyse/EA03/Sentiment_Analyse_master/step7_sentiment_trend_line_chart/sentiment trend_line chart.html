@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>笔记情感趋势折线图</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 ECharts.js 用于绘制图表 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        /* 设置 Inter 字体 */
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
+        /* 确保图表容器有固定高度 */
+        #chart-container { width: 100%; height: 500px; }
+        /* 针对移动端优化容器宽度 */
+        @media (max-width: 768px) {
+            #chart-container { height: 400px; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-10">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">笔记情感趋势分析</h1>
+        <p class="text-gray-500 mb-6 border-b pb-4">基于“日期”与“正文”数据，计算每日平均情感得分（0-1分），展示情感随时间的变化。</p>
+
+        <!-- 数据加载和图表容器 -->
+        <div id="chart-container" class="rounded-lg border border-gray-200 p-4"></div>
+
+        <!-- 模拟数据和处理逻辑说明 -->
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">数据与逻辑说明</h2>
+            <div class="space-y-3 text-sm text-gray-600">
+                <p><span class="font-medium text-blue-600">数据源：</span> 模拟您的 `my_data_fixed.csv` 中的 “日期” 和 “正文” 列。</p>
+                <p><span class="font-medium text-blue-600">情感模拟：</span> 由于浏览器环境无法运行 SnowNLP，此处使用一个**模拟函数**，根据文本长度和关键词（如“早安”、“教育”）随机生成 0 到 1 之间的情感得分，但分数会偏向高分（积极），以模拟您的饼图结果。</p>
+                <p><span class="font-medium text-blue-600">聚合方法：</span> 按日期分组，计算每天所有笔记条目的**平均情感得分**。</p>
+                <p><span class="font-medium text-blue-600">可视化工具：</span> 采用 **ECharts.js** 绘制专业折线图。</p>
+            </div>
+            <button id="show-raw-data" class="mt-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-150">
+                查看原始数据（控制台）
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 步骤 1: 模拟加载您的 my_data_fixed.csv 中的数据
+        // 假设您的CSV数据被正确解析为如下结构：
+        const rawData = [
+            // 2023年数据（情感波动较大）
+            { date: '2023-12-16', content: '3X时光成长计划打卡第一天：12.14到武汉参加“荆楚名家”培训，看到关于“出发”的文章。充满期待、兴奋。' },
+            { date: '2023-12-16', content: '高端培训让我把关注多年的“夏天的风”再次深刻认识。该是要多少的知识储备、情怀储备……' },
+            { date: '2023-12-25', content: '附小工作慎始如终，沐浴阳光，心怀浪漫，迎接挑战，态度决定一切，早安！' },
+            { date: '2023-12-30', content: '年度总结，工作成果丰硕，但仍需反思不足，追求卓越。' },
+            // 2024年数据（情感更稳定，积极词汇更多）
+            { date: '2024-01-05', content: '新的一年，新的篇章，阳光早安。' },
+            { date: '2024-01-05', content: '教育工作责任重大，压力与动力并存。' },
+            { date: '2024-01-15', content: '民大附小教育集团早安声。今天的主题是情绪稳定，温暖而令人感动。' },
+            { date: '2024-01-20', content: '今天处理了一件棘手的行政事务，虽然过程有些不愉快，但结果是好的。' },
+            { date: '2024-02-01', content: '早安！附小老师们都是优秀的，相信团队的力量。' },
+            { date: '2024-02-10', content: '假期读书学习，养得独立又清醒，平静而坚定，丰盈而富足。期待2025。' },
+            { date: '2024-02-25', content: '立德树人，美育教育，黄鹤楼下，使命神圣。' },
+            { date: '2024-03-05', content: '附小工作坊，收获满满，与同事们一起努力思考社会动荡。' },
+            { date: '2024-03-05', content: '校长说，爱要好好爱，要关心自己的情绪状态。' },
+            { date: '2024-03-15', content: '遇到一些困难，但相信拼搏的力量，继续前进。' },
+            { date: '2024-03-25', content: '行政与教育教学两级奔跑，预定成功，早安！' },
+        ];
+
+        // 步骤 2: 模拟情感分析函数
+        // 在浏览器环境中模拟 SnowNLP 的 s.sentiments (0-1 分)
+        function calculateSentimentScore(text) {
+            // 关键词增加积极得分
+            const positiveKeywords = ['早安', '期待', '兴奋', '阳光', '温暖', '感动', '优秀', '努力', '丰硕', '美育', '神圣', '收获'];
+            let baseScore = Math.random() * 0.1 + 0.75; // 基础分在 0.75 到 0.85 之间 (模拟整体高积极性)
+
+            let sentimentAdjustment = 0;
+
+            // 积极关键词加分
+            positiveKeywords.forEach(keyword => {
+                if (text.includes(keyword)) {
+                    sentimentAdjustment += 0.05;
+                }
+            });
+
+            // 文本长度加分 (长篇笔记通常包含更多思考，情感倾向更明确)
+            sentimentAdjustment += Math.min(0.1, text.length / 500);
+
+            // 模拟负面词汇（少量扣分）
+            if (text.includes('不愉快') || text.includes('困难') || text.includes('压力')) {
+                sentimentAdjustment -= 0.1;
+            }
+
+            // 最终得分：确保在 0.05 到 0.99 之间
+            let finalScore = baseScore + sentimentAdjustment;
+            finalScore = Math.max(0.05, Math.min(0.99, finalScore));
+
+            return finalScore;
+        }
+
+        // 步骤 3: 聚合数据并计算每日平均情感得分
+        function aggregateSentimentData(data) {
+            const dailyScores = {};
+
+            data.forEach(item => {
+                const date = item.date;
+                const score = calculateSentimentScore(item.content);
+
+                if (!dailyScores[date]) {
+                    dailyScores[date] = { sum: 0, count: 0, scores: [] };
+                }
+                dailyScores[date].sum += score;
+                dailyScores[date].count++;
+                dailyScores[date].scores.push(score);
+            });
+
+            // 计算每日平均分，并准备 ECharts 格式
+            const trendData = [];
+            const dates = Object.keys(dailyScores).sort();
+
+            dates.forEach(date => {
+                const { sum, count } = dailyScores[date];
+                const averageScore = parseFloat((sum / count).toFixed(4));
+                trendData.push({
+                    date: date,
+                    average: averageScore
+                });
+            });
+
+            return trendData;
+        }
+
+        // 步骤 4: 绘制 ECharts 折线图
+        function drawChart(trendData) {
+            const chartDom = document.getElementById('chart-container');
+            if (!chartDom) return; // 安全检查
+
+            const myChart = echarts.init(chartDom);
+
+            // 提取 X 轴 (日期) 和 Y 轴 (平均得分) 数据
+            const dates = trendData.map(item => item.date);
+            const scores = trendData.map(item => item.average);
+
+            const option = {
+                title: {
+                    text: '情感趋势随时间变化',
+                    left: 'center',
+                    textStyle: {
+                        color: '#4b5563'
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function (params) {
+                        const data = params[0];
+                        return `${data.name}<br/>` +
+                               `<span style="color:${data.color}">●</span> 平均情感得分: <b>${data.value.toFixed(4)}</b>`;
+                    }
+                },
+                legend: {
+                    data: ['平均情感得分'],
+                    bottom: '0'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '10%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: dates,
+                    name: '日期',
+                    axisLabel: {
+                        // 旋转标签以适应密集数据
+                        rotate: 30,
+                        interval: 0,
+                        color: '#6b7280'
+                    },
+                    axisLine: { lineStyle: { color: '#d1d5db' } }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: '平均情感得分 (0-1)',
+                    min: 0.4, // 设置最小刻度，使波动更明显
+                    max: 1.0,
+                    axisLabel: {
+                        formatter: '{value}',
+                        color: '#6b7280'
+                    },
+                    splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } }
+                },
+                series: [
+                    {
+                        name: '平均情感得分',
+                        type: 'line',
+                        data: scores,
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 8,
+                        lineStyle: {
+                            width: 3,
+                            color: '#2563eb' // 蓝色线条
+                        },
+                        itemStyle: {
+                            color: '#2563eb',
+                            borderColor: '#ffffff',
+                            borderWidth: 2
+                        },
+                        // 区域填充，增加可视化效果
+                        areaStyle: {
+                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                                { offset: 0, color: 'rgba(37, 99, 235, 0.4)' },
+                                { offset: 1, color: 'rgba(37, 99, 235, 0)' }
+                            ])
+                        },
+                        markLine: {
+                            data: [
+                                { type: 'average', name: '平均值', lineStyle: { color: '#ef4444', type: 'dashed' } }
+                            ]
+                        }
+                    }
+                ]
+            };
+
+            myChart.setOption(option);
+
+            // 响应式处理
+            window.addEventListener('resize', () => myChart.resize());
+        }
+
+        // 主函数
+        function main() {
+            const trendData = aggregateSentimentData(rawData);
+            drawChart(trendData);
+
+            document.getElementById('show-raw-data').addEventListener('click', () => {
+                console.log("--- 原始模拟数据 ---");
+                console.table(rawData);
+                console.log("--- 每日聚合结果 ---");
+                console.table(trendData);
+                alert("原始数据和每日聚合结果已输出到浏览器的控制台 (Console)。请按 F12 打开查看。");
+            });
+        }
+
+        window.onload = main;
+    </script>
+</body>
+</html>
